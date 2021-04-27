@@ -48,11 +48,18 @@ def generateLuenbergerD(eigen):
     # end
 
 def performMultipleLuenbergerSimulations(f,g,h,dimx,u,D,F,w0_array,nsims,tsim,dt):
-    def dxdt(t,x):
-        return f(x) + g(x) * u(t)
+    def dwdt(t,w):
+        x = w[0:dimx]
+        z = w[dimx:len(w)]
+        x_dot = f(x) + g(x) * u(t)
+        z_dot = np.matmul(z,np.transpose(D))+F*h(x)
+        return [x_dot[0], x_dot[1], z_dot[0], z_dot[1], z_dot[2] ]
 
-    def dzdt(t,z):
-        return D*z+F*h(x)
+
+    # def dzdt(t,z):
+    #     res = np.matmul(z,D)+F*h(z)
+    #     print(res)
+    #     return res
     #     x = w[0:dimx]
     #     A = np.concatenate((f(x),np.zeros((D.shape[1],1))))
     #     B = np.concatenate((np.zeros((dimx,dimx)),np.zeros((D.shape[1],dimx)))) 
@@ -69,10 +76,12 @@ def performMultipleLuenbergerSimulations(f,g,h,dimx,u,D,F,w0_array,nsims,tsim,dt
     output_data = np.zeros(shape=(len(tq), dimx + D.shape[1], nsims))
 
     for i in range(nsims):
-        x0 = w0_array[0:2, i]
-        z0 = w0_array[2:5, i]
-        x_hat = integrate.solve_ivp(dxdt, tspan, w0)
-        z = integrate.solve_ivp(dzdt, tspan, z0)
+        w0 = w0_array[:, i]
+        # x0 = w0_array[0:2, i]
+        # z0 = np.transpose(w0_array[2:5, i])
+        w = integrate.solve_ivp(dwdt, tspan, w0)
+        # z = integrate.solve_ivp(dzdt, tspan, z0)
+        print(w)
 
         # wq = interp1(t,w,tq)
 
@@ -92,7 +101,7 @@ if __name__ == "__main__":
     eigen = np.roots(a)
 
     D = generateLuenbergerD(eigen)
-    F = np.array([[1],[1],[1]])
+    F = np.array([1, 1, 1])
 
     nsims = 10;
 
