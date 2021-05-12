@@ -1,4 +1,5 @@
 from lnos.observer.lueneberger import LuenebergerObserver
+from lnos.datasets.plot import plotLogError2D
 from scipy import signal
 import math
 import numpy as np
@@ -16,7 +17,7 @@ if __name__ == "__main__":
     dim_x = 2
     dim_y = 1
 
-    observer = LuenebergerObserver(dim_x, dim_y)
+    observer = LuenebergerObserver(dim_x, dim_y, f, g, h, u)
 
     # Lueneberger observer params
     b, a = signal.bessel(3, 2*math.pi, 'low', analog=True, norm='phase')
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 
     print(observer.D)
     # Simulate
-    tq, data_fw = observer.simulateLueneberger(f, g, h, u, w0_array, tsim, dt)
+    tq, data_fw = observer.simulateLueneberger(w0_array, tsim, dt)
 
 
 
@@ -64,7 +65,7 @@ if __name__ == "__main__":
     dt = 1e-2
 
     # Simulate 
-    tq, data_bw = observer.simulateLueneberger(f, g, h, u, w1_array, tsim, dt)
+    tq, data_bw = observer.simulateLueneberger(w1_array, tsim, dt)
 
 
     # Create training data
@@ -78,4 +79,11 @@ if __name__ == "__main__":
     # Train model x(t)=T*(z(t))
     dataSize = ((2,5),(0,2))
     inputSize = (3,2)
-    T_star = observer.computeNonlinearLuenbergerTransformation(tq,train_data,False,20,2)
+    observer.computeNonlinearLuenbergerTransformation(tq,train_data,False,50,2)
+
+    net = np.arange(-1,1,0.05)
+    mesh = np.array(np.meshgrid(net,net))
+    combinations = mesh.T.reshape(-1, 2)
+    comb = torch.tensor(combinations)
+
+    plotLogError2D(comb, observer)

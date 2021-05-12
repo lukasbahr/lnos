@@ -20,23 +20,24 @@ class LuenebergerObserver():
         self.u = u
 
         self.F = torch.zeros((self.dim_z, 1))
+        self.eigenD = torch.zeros((self.dim_z, 1))
         self.D = torch.zeros((self.dim_z, self.dim_z))
+
+        self.T = Model(self.dim_x, self.dim_z)
+        self.T_star = Model(self.dim_z, self.dim_x)
 
     def tensorDFromEigen(self, eigen: torch.tensor) -> torch.tensor:
         """
         Generates the state matrix D to use in a Luenberger
         observer given the desired eigenvalues.
-        D = tensorDFromEigen(eigen) returns a real m X m matrix D
-        representing the state matrix of a Luenberger observer. 'eigenvals' is
-        a complex m X 1 matrix containing the desired eigenvalues of the
-        observer. It is assumed all complex eigenvalues are in conjugate pairs.
         """
+        self.eigenD = eigen
         eig_complex, eig_real = [x for x in eigen if x.imag != 0], [
             x for x in eigen if x.imag == 0]
 
         if(any(~np.isnan(eig_complex))):
             eig_complex = sorted(eig_complex)
-            eigenCell = self.matrixFromEigen(eig_complex, eig_real)
+            eigenCell = self.eigenCellFromEigen(eig_complex, eig_real)
             D = linalg.block_diag(*eigenCell[:])
 
             return torch.tensor(D)
@@ -47,11 +48,6 @@ class LuenebergerObserver():
         Generates a cell array containing 2X2 real
         matrices for each pair of complex conjugate eigenvalues passed in the
         arguments, and real scalar for each real eigenvalue.
-        eig_cell = eigenCellFromEigen(eig_complex, eig_real) returns an
-        (m_c/2 + m_r)-dimensional cell array containing a real 2X2 matrix for
-        each complex conjugate pair in the complex m_c X 1 matrix 'eig_complex'
-        containing only complex conjugate pairs, and a real scalar for each
-        eigenvalue in the real m_r X 1 matrix 'eig_real'.
         """
         eigenCell = []
 
@@ -72,20 +68,9 @@ class LuenebergerObserver():
 
     def simulateLueneberger(self, y_0: torch.tensor, tsim: tuple, dt) -> [torch.tensor, torch.tensor]:
         """
-        performMultipleLuenbergerSimulations    Runs and outputs the results from 
+        Runs and outputs the results from 
         multiple simulations of an input-affine nonlinear system driving a 
         Luenberger observer target system.
-
-        [tq, sol] = performMultipleLuenbergerSimulations(f,g,h,dimx,u,D,F,w0_array,...
-        nsims,tsim,dt) returns the output of 'nsims' simulations lasting for
-        time 'tsim' of the n-dimensional state affine nonlinear system with 
-        state function 'f', input function 'g', output function 'g' and input 
-        'u', driving a Luenberger observer with m X m real state matrix D and 
-        m X 1 real input matrix F driven by output from plant. 'w0_array' is an
-        (n+m) X 'nsims' real matrix representing the initial conditions for the
-        plant and observer target system for the simulations to be performed.
-        'dt' is the time step the simulation results are resampled into before
-        getting returned.
         """
         def dydt(t, y):
             x = y[0:self.dim_x]
@@ -108,41 +93,29 @@ class LuenebergerObserver():
 
     # Training pipeline
     def computeNonlinearLuenbergerTransformation(
-            self, tq: torch.Tensor, data: torch.Tensor, isForwardTrans: bool, epochs: int, batchSize: int) -> nn.Module:
+            self, tq: torch.Tensor, data: torch.Tensor, isForwardTrans: bool, epochs: int, batchSize: int):
         """
-        performMultipleLuenbergerSimulations    Runs and outputs the results from 
-        multiple simulations of an input-affine nonlinear system driving a 
-        Luenberger observer target system.
-
-          [tq, output_data] =
-          performMultipleLuenbergerSimulations(f,g,h,dimx,u,D,F,w0_array,...
-          nsims,tsim,dt) returns the output of 'nsims' simulations lasting for
-          time 'tsim' of the n-dimensional state affine nonlinear system with 
-          state function 'f', input function 'g', output function 'g' and input 
-          'u', driving a Luenberger observer with m X m real state matrix D and 
-          m X 1 real input matrix F driven by output from plant. 'w0_array' is an
-          (n+m) X 'nsims' real matrix representing the initial conditions for the
-          plant and observer target system for the simulations to be performed.
-          'dt' is the time step the simulation results are resampled into before
-          getting returned.
+        Numerically estimate the
+        nonlinear Luenberger transformation of a SISO input-affine nonlinear
+        system with static transformation, and the corresponding left-inverse.
         """
         # Set size according to compute either T or T*
         if isForwardTrans:
-            netSize = (self.dim_x, self.dim_z)
+            netSize =  (self.dim_x, self.dim_z)
             dataInput = (0, self.dim_x)
             dataOutput = (self.dim_x, self.dim_x+self.dim_z)
         else:
-            netSize = (self.dim_z, self.dim_x)
+            netSize =  (self.dim_z, self.dim_x)
             dataInput = (self.dim_x, self.dim_x+self.dim_z)
             dataOutput = (0, self.dim_x)
 
         # Make torch use the GPU
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        # T_star params
-        T = Model(netSize[0], netSize[1])
-        T.to(device)
-        optimizer = optim.Adam(T.parameters(), lr=0.001)
+        # model params
+        model = Model(netSize[0], netSize[1])
+        model.to(device)
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
 
         # Network params
         criterion = nn.MSELoss()
@@ -170,7 +143,7 @@ class LuenebergerObserver():
                 optimizer.zero_grad()
 
                 # Forward + Backward + Optimize
-                outputs = T(inputs)
+                outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
@@ -183,12 +156,14 @@ class LuenebergerObserver():
                     running_loss = 0.00
 
             print('====> Epoch: {} done!'.format(epoch))
-
         print('Finished Training')
 
-        return T
-
-# Define NN model
+        if isForwardTrans:
+            self.T = model.to("cpu")
+        else:
+            self.T_star = model.to("cpu")
+        
+        return model
 
 
 class Model(nn.Module):
@@ -201,6 +176,7 @@ class Model(nn.Module):
         self.tanh = nn.Tanh()
 
     def forward(self, x):
+        x = x.float()
         x = self.fc1(x)
         x = self.tanh(self.fc2(x))
         x = self.tanh(self.fc3(x))
