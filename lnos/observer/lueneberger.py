@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils as utils
 import torch
+import matplotlib.pyplot as plt
 
 
 class LuenebergerObserver():
@@ -87,13 +88,35 @@ class LuenebergerObserver():
 
         return tq, sol
 
-    # Normalizing function
     def normalize(self, data):
+        """
+        Simple normalization function between [0,1].
+        """
         return (data-np.min(data))/(np.max(data) - np.min(data))
 
-    # Training pipeline
+    def generateTrainingData(self,points) -> torch.tensor:
+
+        k = 80
+        t_c = k/min(abs(self.eigenD.real))
+        nsims = points.shape[0]
+        y_0 = torch.zeros((self.dim_x + self.dim_z, nsims), dtype=torch.double)
+
+        # Simulate backward
+        dt = -1e-2
+        tsim = (0, -t_c)
+        y_0[:self.dim_x,:] = torch.transpose(points,0,1)
+        tq, data_bw = self.simulateLueneberger(y_0, tsim, dt)
+
+        # Simulate forward
+        dt = 1e-2
+        tsim = (-t_c,0)
+        y_0[:self.dim_x,:] = data_bw[-1,:self.dim_x,:]
+        tq, data_fw = self.simulateLueneberger(y_0, tsim, dt)
+
+        return torch.transpose(data_fw[-1,:, :],0,1).float()
+
     def computeNonlinearLuenbergerTransformation(
-            self, tq: torch.Tensor, data: torch.Tensor, isForwardTrans: bool, epochs: int, batchSize: int):
+            self, data: torch.Tensor, isForwardTrans: bool, epochs: int, batchSize: int):
         """
         Numerically estimate the
         nonlinear Luenberger transformation of a SISO input-affine nonlinear
@@ -155,7 +178,7 @@ class LuenebergerObserver():
                           (epoch + 1, i + 1, running_loss / 200))
                     running_loss = 0.00
 
-            print('====> Epoch: {} done!'.format(epoch))
+            print('====> Epoch: {} done!'.format(epoch + 1))
         print('Finished Training')
 
         if isForwardTrans:

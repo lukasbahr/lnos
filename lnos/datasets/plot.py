@@ -15,35 +15,43 @@ def rms_error(x, x_hat):
 
 def plotLogError2D(points, observer: LuenebergerObserver):
 
+    dim_x = observer.dim_x
+    dim_z = observer.dim_z
+
     # Simulation parameters for ODE
-    gamma = abs(min(observer.eigenD))
+    k = 40
+    t_c = k/min(abs(observer.eigenD.real))
     nsims = points.shape[0]
-    y_0 = torch.zeros((observer.dim_x + observer.dim_z, nsims), dtype=torch.double)
+    y_0 = torch.zeros((dim_x + dim_z, nsims), dtype=torch.double)
 
     # Simulate backward
     dt = -1e-2
-    tsim = (0, -gamma.real/10)
-    y_0[:observer.dim_x,:] = torch.transpose(points,0,1)
+    tsim = (0, -t_c)
+    y_0[:dim_x,:] = torch.transpose(points,0,1)
     tq, data_bw = observer.simulateLueneberger(y_0, tsim, dt)
 
     # Simulate forward
     dt = 1e-2
-    tsim = (-gamma.real/10,0)
-    y_0[:observer.dim_x,:] = data_bw[-1,:observer.dim_x,:]
+    tsim = (-t_c,0)
+    y_0[:dim_x,:] = data_bw[-1,:dim_x,:]
     tq, data_fw = observer.simulateLueneberger(y_0, tsim, dt)
 
 
-    inputs = torch.tensor(data_fw[-1,observer.dim_x:observer.dim_x+observer.dim_z,:],dtype=torch.float64)
+    inputs = torch.tensor(data_fw[-1,dim_x:dim_x+dim_z,:],dtype=torch.float64)
     inputs = Variable(torch.transpose(inputs,0,1), requires_grad=False)
 
     # Sample data from T*
     x_hat = observer.T_star(inputs)
     x_hat = x_hat.detach().numpy().T
-    x = data_fw[-1,:observer.dim_x,:].numpy()
+    x = data_fw[-1,:dim_x,:].numpy()
 
     plt.scatter(points[:,0], points[:,1], cmap='jet',
                 c=rms_error(x,x_hat))
     cbar = plt.colorbar()
     cbar.set_label('Log relative error')
 
+    plt.show()
+
+def plotTrajectory2D(x):
+    plt.plot(x[0], x[1])
     plt.show()
