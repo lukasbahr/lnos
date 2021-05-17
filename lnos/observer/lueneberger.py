@@ -96,7 +96,7 @@ class LuenebergerObserver():
 
     def generateTrainingData(self,points) -> torch.tensor:
 
-        k = 80
+        k = 10
         t_c = k/min(abs(self.eigenD.real))
         nsims = points.shape[0]
         y_0 = torch.zeros((self.dim_x + self.dim_z, nsims), dtype=torch.double)
@@ -104,13 +104,13 @@ class LuenebergerObserver():
 
         # Simulate backward
         dt = -1e-2
-        tsim = (0, -10)
+        tsim = (0, -t_c)
         y_0[:self.dim_x,:] = torch.transpose(points,0,1)
         tq, data_bw = self.simulateLueneberger(y_0, tsim, dt)
 
         # Simulate forward
         dt = 1e-2
-        tsim = (-10,0)
+        tsim = (-t_c,0)
         y_1[:self.dim_x,:] = data_bw[-1,:self.dim_x,:]
         tq, data_fw = self.simulateLueneberger(y_1, tsim, dt)
 
