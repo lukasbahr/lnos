@@ -14,12 +14,14 @@ def getParams():
 
     # settings related to loss function
     params['num_shifts'] = 30
-    params['batch_size'] = 30
+    params['batch_size'] = 5
+    params['simulation_time'] = 60
+    params['simulation_dt'] = 1e-2
 
     return params
 
 
-def createTrainingData():
+def createTrainingData(params):
 
     f, h, g, u, dim_x, dim_y, eigen = getAutonomousSystem()
 
@@ -28,7 +30,7 @@ def createTrainingData():
 
     # Set system dynamics
     observer.D = observer.tensorDFromEigen(eigen)
-    observer.F = torch.tensor([[1.0], [1.0], [1.0]])
+    observer.F = torch.Tensor([[1.0], [1.0], [1.0]])
 
     net = np.arange(0.1, 1, 0.5)
     mesh = np.array(np.meshgrid(net, net))
@@ -38,8 +40,8 @@ def createTrainingData():
     nsims = points.shape[0]
     y_0 = torch.zeros((observer.dim_x + observer.dim_z, nsims), dtype=torch.double)
 
-    dt = 1e-2
-    tsim = (0, 40)
+    dt = params['simulation_dt']
+    tsim = (0, params['simulation_time'])
     y_0[:observer.dim_x, :] = torch.transpose(points, 0, 1)
     tq, data = observer.simulateLueneberger(y_0, tsim, dt)
 
@@ -49,10 +51,13 @@ def createTrainingData():
     idx = max(np.argwhere(tq < t_c))
     data = data[idx[-1]-1:, :, :]
 
+    params['simulation_time_offset'] = int(params['simulation_time']/params['simulation_dt'] - (idx[-1]-1))
+
     return data, observer
 
 
 def splitDataShifts(data, num_shifts):
+    #TODO fix that
 
     n = data.shape[1]
 
@@ -68,7 +73,7 @@ def splitDataShifts(data, num_shifts):
 
 def train():
     params = getParams()
-    data, observer = createTrainingData()
+    data, observer = createTrainingData(params)
 
     # Make torch use the GPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -85,9 +90,11 @@ def train():
         numSamples = dataTrain.shape[1]
         numBatches = int(np.floor(dataTrain.shape[1] / params['batch_size']))
 
-        ind = np.arange(numSamples)
-        np.random.shuffle(ind)
-        dataTrain = dataTrain[:, ind, :]
+        # ind = np.arange(numSamples)
+        # np.random.shuffle(ind)
+        # dataTrain = dataTrain[:, ind, :]
+
+        running_loss = 0.0
 
         for step in range(numBatches):
 
@@ -97,9 +104,17 @@ def train():
              # Zero the parameter gradients
             optimizer.zero_grad()
 
-            # Forward + Backward + Optimize
-            outputs = model(batchDataTrain[:,:,:2])
+            # Forward 
+            x, y, z_k, encodedList = model(batchDataTrain[:,:,:2],params, step)
 
+            # Forward + Backward + Optimize
+            loss = model.loss(x, y, z_k, encodedList)
+            loss.backward()
+            optimizer.step()
+
+            print('{} loss: {}'.format(step,loss))
+
+    print('Finished Training')
 
 
 

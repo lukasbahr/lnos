@@ -33,7 +33,7 @@ class LuenebergerObserver():
             eigenCell = self.eigenCellFromEigen(eig_complex, eig_real)
             D = linalg.block_diag(*eigenCell[:])
 
-            return torch.tensor(D)
+            return torch.tensor(D,dtype=torch.float32)
 
     @staticmethod
     def eigenCellFromEigen(eig_complex: torch.tensor, eig_real: torch.tensor) -> []:
@@ -66,6 +66,7 @@ class LuenebergerObserver():
         Luenberger observer target system.
         """
         def dydt(t, y):
+            y = y.float()
             x = y[0:self.dim_x]
             z = y[self.dim_x:len(y)]
             x_dot = self.f(x) + self.g(x) * self.u(t)

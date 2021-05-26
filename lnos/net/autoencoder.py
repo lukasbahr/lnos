@@ -1,5 +1,20 @@
 from lnos.observer.lueneberger import LuenebergerObserver
+import torch
 from torch import nn
+import numpy as np
+
+def splitDataShifts(data, num_shifts):
+
+    n = data.shape[1]
+
+    numTraj = int(data.shape[0] / num_shifts)
+
+    dataTensor = np.zeros([num_shifts + 1, numTraj, n])
+
+    for j in range(num_shifts):
+        dataTensor[j, :, :] = data[j*numTraj:(j+1)*numTraj, :]
+
+    return dataTensor
 
 
 
@@ -33,16 +48,32 @@ class Autoencoder(nn.Module):
         x = self.fc8(x)
         return x
 
-    def forward(self, x):
+    def loss(self, x, y, z_k, encodedList):
+
+        mse = nn.MSELoss()
+        loss1 = mse(x,y)
+
+        loss2 = mse(encodedList, z_k)
+
+        loss = loss1 + loss2
+
+        return loss
+
+
+    def forward(self, x, params, step):
         """Takes a batch of samples, encodes them, and then decodes them again to compare."""
         encodedList = self.encoderShiftForward(x)
 
-        z_0 = encodedList[0,:,:]
-        # y = []
-        # y.append(self.decoder(z_0))
+        w_0 = torch.reshape(torch.cat((x[0, 0, :], encodedList[0, 0, :])), (-1, 1))
 
-        tq, z_k = self.observer.simulateLueneberger(z_0, (0.0,float(x.shape[0])), 1)
+        tq, z_k = self.observer.simulateLueneberger(w_0, (0.0, params['simulation_time']), params['simulation_dt'])
+        z_k = z_k[:params['simulation_time_offset'], :]
+
+        z_k = splitDataShifts(z_k[:,:,0].detach().numpy(), params['num_shifts'])
+        z_k = z_k[:, step*params['batch_size']:(step+1)*params['batch_size'], :]
+
+        z_k = torch.Tensor(z_k[:,:,2:])
 
         y = self.decoder(z_k)
 
-        return x, y, z_k, encodedList 
+        return x, y, z_k, encodedList
