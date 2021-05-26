@@ -1,12 +1,7 @@
 import numpy as np
 from scipy import linalg, integrate, interpolate
 from torchdiffeq import odeint
-import torch.nn as nn
-import torch.optim as optim
-import torch.utils as utils
 import torch
-import matplotlib.pyplot as plt
-
 
 class LuenebergerObserver():
 
@@ -23,9 +18,6 @@ class LuenebergerObserver():
         self.F = torch.zeros((self.dim_z, 1))
         self.eigenD = torch.zeros((self.dim_z, 1))
         self.D = torch.zeros((self.dim_z, self.dim_z))
-
-        self.T = Model(self.dim_x, self.dim_z)
-        self.T_star = Model(self.dim_z, self.dim_x)
 
     def tensorDFromEigen(self, eigen: torch.tensor) -> torch.tensor:
         """
@@ -87,122 +79,3 @@ class LuenebergerObserver():
         sol = odeint(dydt, y_0, tq)
 
         return tq, sol
-
-    def normalize(self, data):
-        """
-        Simple normalization function between [0,1].
-        """
-        return (data-np.min(data))/(np.max(data) - np.min(data))
-
-    def generateTrainingData(self,points) -> torch.tensor:
-
-        k = 10
-        t_c = k/min(abs(self.eigenD.real))
-        nsims = points.shape[0]
-        y_0 = torch.zeros((self.dim_x + self.dim_z, nsims), dtype=torch.double)
-        y_1 = torch.zeros((self.dim_x + self.dim_z, nsims), dtype=torch.double)
-
-        # Simulate backward
-        dt = -1e-2
-        tsim = (0, -t_c)
-        y_0[:self.dim_x,:] = torch.transpose(points,0,1)
-        tq, data_bw = self.simulateLueneberger(y_0, tsim, dt)
-
-        # Simulate forward
-        dt = 1e-2
-        tsim = (-t_c,0)
-        y_1[:self.dim_x,:] = data_bw[-1,:self.dim_x,:]
-        tq, data_fw = self.simulateLueneberger(y_1, tsim, dt)
-
-        return torch.transpose(data_fw[-1,:, :],0,1).float()
-
-    def computeNonlinearLuenbergerTransformation(
-            self, data: torch.Tensor, isForwardTrans: bool, epochs: int, batchSize: int):
-        """
-        Numerically estimate the
-        nonlinear Luenberger transformation of a SISO input-affine nonlinear
-        system with static transformation, and the corresponding left-inverse.
-        """
-        # Set size according to compute either T or T*
-        if isForwardTrans:
-            netSize =  (self.dim_x, self.dim_z)
-            dataInput = (0, self.dim_x)
-            dataOutput = (self.dim_x, self.dim_x+self.dim_z)
-        else:
-            netSize =  (self.dim_z, self.dim_x)
-            dataInput = (self.dim_x, self.dim_x+self.dim_z)
-            dataOutput = (0, self.dim_x)
-
-        # Make torch use the GPU
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-        # model params
-        model = Model(netSize[0], netSize[1])
-        model.to(device)
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-        # Network params
-        criterion = nn.MSELoss()
-        epochs = epochs
-        batchSize = batchSize
-
-        # Create trainloader
-        trainloader = utils.data.DataLoader(data, batch_size=batchSize,
-                                            shuffle=True, num_workers=2)
-
-        # Train Transformation
-        # Loop over dataset
-        for epoch in range(epochs):
-
-            # Track loss
-            running_loss = 0.0
-
-            # Train
-            for i, data in enumerate(trainloader, 0):
-                # Set input and labels
-                inputs = data[:, dataInput[0]:dataInput[1]].to(device)
-                labels = data[:, dataOutput[0]:dataOutput[1]].to(device)
-
-                # Zero the parameter gradients
-                optimizer.zero_grad()
-
-                # Forward + Backward + Optimize
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-
-                # Print statistics
-                running_loss += loss.item()
-                if i % 200 == 199:    # print every 2000 mini-batches
-                    print('[%d, %5d] loss: %.3f' %
-                          (epoch + 1, i + 1, running_loss / 200))
-                    running_loss = 0.00
-
-            print('====> Epoch: {} done!'.format(epoch + 1))
-        print('Finished Training')
-
-        if isForwardTrans:
-            self.T = model.to("cpu")
-        else:
-            self.T_star = model.to("cpu")
-        
-        return model
-
-
-class Model(nn.Module):
-    def __init__(self, inputSize, outputSize):
-        super().__init__()
-        self.fc1 = nn.Linear(inputSize, 25)
-        self.fc2 = nn.Linear(25, 25)
-        self.fc3 = nn.Linear(25, 25)
-        self.fc4 = nn.Linear(25, outputSize)
-        self.tanh = nn.Tanh()
-
-    def forward(self, x):
-        x = x.float()
-        x = self.fc1(x)
-        x = self.tanh(self.fc2(x))
-        x = self.tanh(self.fc3(x))
-        x = self.fc4(x)
-        return x

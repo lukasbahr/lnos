@@ -1,5 +1,8 @@
 from lnos.observer.lueneberger import LuenebergerObserver
 from lnos.datasets.plot import plotLogError2D, plotTrajectory2D
+import lnos.net.linear as ln
+from lnos.datasets.exampleSystems import getAutonomousSystem
+
 from scipy import signal
 import math
 import numpy as np
@@ -9,22 +12,12 @@ import matplotlib.pyplot as plt
 from torch.autograd import Variable
 
 if __name__ == "__main__":
-    # Define plant dynamics
-    def f(x): return torch.cat((torch.reshape(torch.pow(x[1, :], 3), (1, -1)), torch.reshape(-x[0, :], (1, -1))), 0)
-    def h(x): return torch.reshape(x[0, :], (1, -1))
-    def g(x): return torch.zeros(x.shape[0], x.shape[1])
-    def u(x): return 0
 
-    # System dimension
-    dim_x = 2
-    dim_y = 1
+    # Get plant dynamics
+    f, h, g, u, dim_x, dim_y, eigen = getAutonomousSystem()
 
     # Initiate observer with system dimensions
     observer = LuenebergerObserver(dim_x, dim_y, f, g, h, u)
-
-    # Eigenvalues for D 
-    b, a = signal.bessel(3, 2*math.pi, 'low', analog=True, norm='phase')
-    eigen = np.roots(a)
 
     # Set system dynamics
     observer.D = observer.tensorDFromEigen(eigen)
@@ -39,10 +32,10 @@ if __name__ == "__main__":
     comb = torch.tensor(combinations)
 
     # Generate training data
-    train_data = observer.generateTrainingData(comb)
-    print(train_data.shape)
+    train_data = ln.generateTrainingData(comb, observer)
 
-    T_star = observer.computeNonlinearLuenbergerTransformation(train_data, False, 20, 2)
+    T_star = ln.trainNonlinearLuenbergerTransformation(train_data, observer, False, 20, 2)
+    T_star = T_star.to("cpu")
     
 
     # Simulation parameters for ODE
@@ -58,7 +51,7 @@ if __name__ == "__main__":
     input = Variable(input[:,2:])
 
     # Sample data from T*
-    x_hat = observer.T_star(input)
+    x_hat = T_star(input)
     x_hat = x_hat.detach().numpy()
 
     # Plot x_1
@@ -77,4 +70,4 @@ if __name__ == "__main__":
     comb = torch.tensor(combinations)
 
     # Plot 2D log error 
-    plotLogError2D(comb, observer)
+    plotLogError2D(comb, observer,T_star)

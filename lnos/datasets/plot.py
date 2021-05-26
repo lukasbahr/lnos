@@ -13,7 +13,7 @@ def rms_error(x, x_hat):
         )
     )
 
-def plotLogError2D(points, observer: LuenebergerObserver):
+def plotLogError2D(points, observer: LuenebergerObserver, T_star):
 
     dim_x = observer.dim_x
     dim_z = observer.dim_z
@@ -41,7 +41,7 @@ def plotLogError2D(points, observer: LuenebergerObserver):
     inputs = Variable(torch.transpose(inputs,0,1), requires_grad=False)
 
     # Sample data from T*
-    x_hat = observer.T_star(inputs)
+    x_hat = T_star(inputs)
     x_hat = x_hat.detach().numpy().T
     x = data_fw[-1,:dim_x,:].numpy()
 
