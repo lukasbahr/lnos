@@ -8,9 +8,6 @@ setup(
     author_email='jladan@uwaterloo.ca',
     # Needed to actually package something
     packages=['lnos', 'lnos.net', 'lnos.experiments', 'lnos.datasets', 'lnos.observer'],
-    package_dir={
-        'lnos': '.',
-    },
     # Needed for dependencies
     install_requires=['numpy', 'torch', 'scipy', 'matplotlib'],
     # *strongly* suggested for sharing
