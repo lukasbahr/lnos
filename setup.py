@@ -7,9 +7,12 @@ setup(
     author='John Ladan',
     author_email='jladan@uwaterloo.ca',
     # Needed to actually package something
-    packages=['lnos','lnos.net','lnos.experiments','lnos.datasets','lnos.observer'],
+    packages=['lnos', 'lnos.net', 'lnos.experiments', 'lnos.datasets', 'lnos.observer'],
+    package_dir={
+        'lnos': '.',
+    },
     # Needed for dependencies
-    install_requires=['numpy','torch','scipy','matplotlib'],
+    install_requires=['numpy', 'torch', 'scipy', 'matplotlib'],
     # *strongly* suggested for sharing
     version='0.1',
     # The license can be anything you like
