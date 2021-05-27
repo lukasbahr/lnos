@@ -1,4 +1,5 @@
 from lnos.net.autoencoder import Autoencoder
+from lnos.net.helperfnc import splitDataShifts
 from lnos.observer.lueneberger import LuenebergerObserver
 from lnos.datasets.exampleSystems import getAutonomousSystem
 import matplotlib.pyplot as plt
@@ -13,16 +14,14 @@ def getParams():
     params = {}
 
     # settings related to loss function
-    params['num_shifts'] = 30
+    params['num_shifts'] = 5
     params['batch_size'] = 5
-    params['simulation_time'] = 60
+    params['simulation_time'] = 20
     params['simulation_dt'] = 1e-2
 
     return params
 
-
-def createTrainingData(params):
-
+def createObserver():
     f, h, g, u, dim_x, dim_y, eigen = getAutonomousSystem()
 
     # Initiate observer with system dimensions
@@ -32,7 +31,15 @@ def createTrainingData(params):
     observer.D = observer.tensorDFromEigen(eigen)
     observer.F = torch.Tensor([[1.0], [1.0], [1.0]])
 
-    net = np.arange(0.1, 1, 0.5)
+    return observer
+
+
+def createTrainingData(params):
+
+    observer = createObserver()
+    
+
+    net = np.arange(-1, 1, 0.2)
     mesh = np.array(np.meshgrid(net, net))
     combinations = mesh.T.reshape(-1, 2)
     points = torch.tensor(combinations)
@@ -54,21 +61,6 @@ def createTrainingData(params):
     params['simulation_time_offset'] = int(params['simulation_time']/params['simulation_dt'] - (idx[-1]-1))
 
     return data, observer
-
-
-def splitDataShifts(data, num_shifts):
-    #TODO fix that
-
-    n = data.shape[1]
-
-    numTraj = int(data.shape[0] / num_shifts)
-
-    dataTensor = np.zeros([num_shifts + 1, numTraj, n])
-
-    for j in range(num_shifts):
-        dataTensor[j, :, :] = data[j*numTraj:(j+1)*numTraj, :]
-
-    return dataTensor
 
 
 def train():
@@ -104,19 +96,14 @@ def train():
              # Zero the parameter gradients
             optimizer.zero_grad()
 
-            # Forward 
+                # Forward 
             x, y, z_k, encodedList = model(batchDataTrain[:,:,:2],params, step)
 
             # Forward + Backward + Optimize
-            loss = model.loss(x, y, z_k, encodedList)
+            loss = model.loss(x[2:,:,:], y[2:,:,:], z_k[2:,:,:], encodedList[2:,:,:])
             loss.backward()
             optimizer.step()
 
             print('{} loss: {}'.format(step,loss))
 
     print('Finished Training')
-
-
-
-if __name__ == "__main__":
-    train()
