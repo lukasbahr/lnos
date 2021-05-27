@@ -1,4 +1,4 @@
-
+import numpy as np
 
 def splitDataShifts(data, num_shifts):
     #TODO fix that
