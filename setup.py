@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     # Needed to silence warnings (and to be a worthwhile package)
@@ -7,7 +7,7 @@ setup(
     author='John Ladan',
     author_email='jladan@uwaterloo.ca',
     # Needed to actually package something
-    packages=['lnos', 'lnos.net', 'lnos.experiments', 'lnos.datasets', 'lnos.observer'],
+    packages=find_packages(exclude=('tests', 'docs')),
     # Needed for dependencies
     install_requires=['numpy', 'torch', 'scipy', 'matplotlib'],
     # *strongly* suggested for sharing
