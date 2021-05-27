@@ -7,7 +7,6 @@ setup(
     author='John Ladan',
     author_email='jladan@uwaterloo.ca',
     # Needed to actually package something
-    packages=find_packages(exclude=('tests', 'docs')),
     # Needed for dependencies
     install_requires=['numpy', 'torch', 'scipy', 'matplotlib'],
     # *strongly* suggested for sharing
@@ -17,4 +16,5 @@ setup(
     description='An example of a python package from pre-existing code',
     # We will also need a readme eventually (there will be a warning)
     # long_description=open('README.txt').read(),
+    packages = find_packages(),
 )
