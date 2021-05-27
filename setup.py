@@ -7,9 +7,9 @@ setup(
     author='John Ladan',
     author_email='jladan@uwaterloo.ca',
     # Needed to actually package something
-    packages=['measure'],
+    packages=['lnos'],
     # Needed for dependencies
-    install_requires=['numpy'],
+    install_requires=['numpy','torch','math','scipy','matplotlib'],
     # *strongly* suggested for sharing
     version='0.1',
     # The license can be anything you like
