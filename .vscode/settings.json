@@ -3,5 +3,6 @@
     "python.formatting.autopep8Args": [
         "--max-line-length", "120", "--experimental"
     ],
-    "files.eol": "\n"
+    "files.eol": "\n",
+    "jupyter.jupyterServerType": "local"
 }

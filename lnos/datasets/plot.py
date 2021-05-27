@@ -53,7 +53,7 @@ def plotLogError2D(points, observer: LuenebergerObserver, T_star):
     plt.show()
 
 def plotTrajectory2D(x):
-    plt.plot(x[0], x[1])
+    plt.scatter(x[0], x[1])
     plt.show()
 
 def plotSimulation2D(tq, x):
