@@ -9,6 +9,8 @@ import torch.optim as optim
 import torch.utils as utils
 import numpy as np
 
+from torch.utils.tensorboard import SummaryWriter
+
 
 def getParams():
     params = {}
@@ -18,8 +20,10 @@ def getParams():
     params['batch_size'] = 5
     params['simulation_time'] = 20
     params['simulation_dt'] = 1e-2
+    params['isTensorboard'] = True
 
     return params
+
 
 def createObserver():
     f, h, g, u, dim_x, dim_y, eigen = getAutonomousSystem()
@@ -37,7 +41,6 @@ def createObserver():
 def createTrainingData(params):
 
     observer = createObserver()
-    
 
     net = np.arange(-1, 1, 0.2)
     mesh = np.array(np.meshgrid(net, net))
@@ -54,7 +57,7 @@ def createTrainingData(params):
 
     # Bin initial data
     k = 5
-    t_c = k/min(abs(eigen.real))
+    t_c = k/min(abs(observer.eigenD.real))
     idx = max(np.argwhere(tq < t_c))
     data = data[idx[-1]-1:, :, :]
 
@@ -75,6 +78,8 @@ def train():
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+    if params['isTensorboard']:
+        writer = SummaryWriter()
 
     for i in range(data.shape[-1]):
 
@@ -93,17 +98,45 @@ def train():
             batchDataTrain = dataTrain[:, step*params['batch_size']:(step+1)*params['batch_size'], :]
             batchDataTrain = torch.Tensor(batchDataTrain)
 
-             # Zero the parameter gradients
+            # Zero the parameter gradients
             optimizer.zero_grad()
 
-                # Forward 
-            x, y, z_k, encodedList = model(batchDataTrain[:,:,:2],params, step)
+            # Forward
+            x, y, z_k, encodedList = model(batchDataTrain[:, :, :2], params, step, False)
 
             # Forward + Backward + Optimize
-            loss = model.loss(x[2:,:,:], y[2:,:,:], z_k[2:,:,:], encodedList[2:,:,:])
+            loss, loss1, loss2 = model.loss(x[2:, :, :], y[2:, :, :], z_k[2:, :, :], encodedList[2:, :, :])
+            if params['isTensorboard']:
+                writer.add_scalars("Loss/train", {
+                    'loss': loss,
+                    'loss1': loss1,
+                    'loss2': loss2,
+                }, step + (i*data.shape[-1]))
+                writer.flush()
+
             loss.backward()
             optimizer.step()
 
-            print('{} loss: {}'.format(step,loss))
+            print('{} loss: {}'.format(step, loss))
+
+        # validate prediction
+
+        
+
+        if params['isTensorboard']:
+            with torch.no_grad():
+                x, y, z_k, encodedList = model(torch.Tensor(dataTrain[:, :, :2]), params, 0, True)
+            y = y.view(y.shape[0]*y.shape[1], 2)
+            x = x.view(x.shape[0]*x.shape[1], 2)
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+            ax.plot(torch.arange(y.shape[0]), y[:,0])
+            ax.plot(torch.arange(x.shape[0]), x[:,0])
+            writer.add_figure("recon", fig, global_step=i, close=True, walltime=None)
+            writer.flush()
+
 
     print('Finished Training')
+
+    if params['isTensorboard']:
+        writer.close()

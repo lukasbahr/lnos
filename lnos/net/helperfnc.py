@@ -7,7 +7,7 @@ def splitDataShifts(data, num_shifts):
 
     numTraj = int(data.shape[0] / num_shifts)
 
-    dataTensor = np.zeros([num_shifts + 1, numTraj, n])
+    dataTensor = np.zeros([num_shifts, numTraj, n])
 
     for j in range(num_shifts):
         dataTensor[j, :, :] = data[j*numTraj:(j+1)*numTraj, :]
