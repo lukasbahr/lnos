@@ -9,6 +9,7 @@ __pycache__/
 __init__.pyc
 
 # Log files
+runs/
 
 # Editor directories and files
 .idea

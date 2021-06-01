@@ -19,7 +19,7 @@ class Autoencoder(nn.Module):
         self.fc8 = nn.Linear(25, inputSize)
         self.tanh = nn.Tanh()
 
-    def encoderShiftForward(self, x):
+    def encoder(self, x):
         """Encode a batch of samples, and return posterior parameters for each point."""
         x = self.fc1(x)
         x = self.tanh(self.fc2(x))
@@ -34,39 +34,29 @@ class Autoencoder(nn.Module):
         x = self.fc8(x)
         return x
 
-    def loss(self, x, y, z_k, encodedList):
+    def loss(self, x, x_hat, dTdx, z, observer, params):
 
         mse = nn.MSELoss()
-        loss1 = mse(x,y)
+        loss1 = mse(x,x_hat)
 
-        loss2 = mse(encodedList, z_k)
+        lhs = torch.zeros((observer.dim_z,params['batchSize']))
+        for i in range(params['batchSize']):
+            lhs[:,i] = torch.matmul(dTdx[i],observer.f(x.T).T[i]).T
+
+        rhs = torch.matmul(observer.D,z.T)+torch.matmul(observer.F,observer.h(x.T))
+
+        loss2 = mse(lhs, rhs)
 
         loss = loss1 + loss2
 
         return loss, loss1, loss2
 
 
-    def forward(self, x, params, step, isValidate):
+    def forward(self, x, params):
         """Takes a batch of samples, encodes them, and then decodes them again to compare."""
 
-        if isValidate:
-            batchSize = -1
-        else:
-            batchSize = params['batch_size']
+        z = self.encoder(x)
 
-        encodedList = self.encoderShiftForward(x)
+        x_hat = self.decoder(z)
 
-
-        w_0 = torch.reshape(torch.cat((x[0, 0, :], encodedList[0, 0, :])), (-1, 1))
-
-        tq, z_k = self.observer.simulateLueneberger(w_0, (0.0, params['simulation_time']), params['simulation_dt'])
-        z_k = z_k[:params['simulation_time_offset'], :]
-
-        z_k = splitDataShifts(z_k[:,:,0].detach().numpy(), params['num_shifts'])
-        z_k = z_k[:, step*batchSize:(step+1)*batchSize, :]
-
-        z_k = torch.Tensor(z_k[:,:,2:])
-
-        y = self.decoder(z_k)
-
-        return x, y, z_k, encodedList
+        return z, x_hat

@@ -1,3 +1,4 @@
 from lnos.experiments import autonomous_autoencoder
 
-autonomous_autoencoder.train()
+if __name__ == '__main__':
+    autonomous_autoencoder.train()
