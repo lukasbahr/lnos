@@ -1,22 +1,22 @@
 from lnos.observer.lueneberger import LuenebergerObserver
-from lnos.net.helperfnc import splitDataShifts
 import torch
 from torch import nn
-import numpy as np
 
 class Autoencoder(nn.Module):
-    def __init__(self, inputSize, outputSize, observer: LuenebergerObserver):
+    def __init__(self, observer: LuenebergerObserver, options):
         super(Autoencoder, self).__init__()
         self.observer = observer
-        self.fc1 = nn.Linear(inputSize, 25)
+        self.options = options
+
+        self.fc1 = nn.Linear(self.observer.dim_x, 25)
         self.fc2 = nn.Linear(25, 25)
         self.fc3 = nn.Linear(25, 25)
-        self.fc4 = nn.Linear(25, outputSize)
+        self.fc4 = nn.Linear(25, self.observer.dim_z)
 
-        self.fc5 = nn.Linear(outputSize, 25)
+        self.fc5 = nn.Linear(self.observer.dim_z, 25)
         self.fc6 = nn.Linear(25, 25)
         self.fc7 = nn.Linear(25, 25)
-        self.fc8 = nn.Linear(25, inputSize)
+        self.fc8 = nn.Linear(25, self.observer.dim_x)
         self.tanh = nn.Tanh()
 
     def encoder(self, x):
@@ -34,16 +34,16 @@ class Autoencoder(nn.Module):
         x = self.fc8(x)
         return x
 
-    def loss(self, x, x_hat, dTdx, z, observer, params):
+    def loss(self, x, x_hat, dTdx, z):
 
         mse = nn.MSELoss()
         loss1 = mse(x,x_hat)
 
-        lhs = torch.zeros((observer.dim_z,params['batchSize']))
-        for i in range(params['batchSize']):
-            lhs[:,i] = torch.matmul(dTdx[i],observer.f(x.T).T[i]).T
+        lhs = torch.zeros((self.observer.dim_z,self.options['batchSize']))
+        for i in range(self.options['batchSize']):
+            lhs[:,i] = torch.matmul(dTdx[i],self.observer.f(x.T).T[i]).T
 
-        rhs = torch.matmul(observer.D,z.T)+torch.matmul(observer.F,observer.h(x.T))
+        rhs = torch.matmul(self.observer.D,z.T)+torch.matmul(self.observer.F,self.observer.h(x.T))
 
         loss2 = mse(lhs, rhs)
 
@@ -52,7 +52,7 @@ class Autoencoder(nn.Module):
         return loss, loss1, loss2
 
 
-    def forward(self, x, params):
+    def forward(self, x):
         """Takes a batch of samples, encodes them, and then decodes them again to compare."""
 
         z = self.encoder(x)
