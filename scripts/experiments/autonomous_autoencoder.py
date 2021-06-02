@@ -1,6 +1,5 @@
 import sys ; sys.path.append(sys.path[0]+'/../..')
-from lnos.observer.lueneberger import LuenebergerObserver
-from lnos.datasets.exampleSystems import getAutonomousSystem
+from lnos.datasets.exampleSystems import createDefaultObserver
 from lnos.net.helperfnc import generateTrainingData
 from lnos.net.train import trainAutoencoder
 import torch
@@ -22,21 +21,10 @@ def getOptions():
 
     return options
 
-def createObserver():
-    f, h, g, u, dim_x, dim_y, eigen = getAutonomousSystem()
-
-    # Initiate observer with system dimensions
-    observer = LuenebergerObserver(dim_x, dim_y, f, g, h, u)
-
-    # Set system dynamics
-    observer.D = observer.tensorDFromEigen(eigen)
-    observer.F = torch.Tensor([[1.0], [1.0], [1.0]])
-
-    return observer
 
 if __name__ == "__main__":
     options = getOptions()
-    observer = createObserver()
+    observer = createDefaultObserver()
     data = generateTrainingData(observer,options)
     trainAutoencoder(data, observer, options)
 

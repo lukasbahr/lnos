@@ -1,3 +1,4 @@
+from lnos.observer.lueneberger import LuenebergerObserver
 from scipy import signal
 import numpy as np
 import math
@@ -19,3 +20,16 @@ def getAutonomousSystem():
     eigen = np.roots(a)
 
     return f,h,g,u,dim_x,dim_y,eigen
+
+def createDefaultObserver():
+    f, h, g, u, dim_x, dim_y, eigen = getAutonomousSystem()
+
+    # Initiate observer with system dimensions
+    observer = LuenebergerObserver(dim_x, dim_y, f, g, h, u)
+
+    # Set system dynamics
+    observer.D = observer.tensorDFromEigen(eigen)
+    observer.F = torch.Tensor([[1.0], [1.0], [1.0]])
+
+    return observer
+
