@@ -127,7 +127,6 @@ def trainAutoencoder(data, observer, options):
                     'loss1': loss1,
                     'loss2': loss2,
                 }, i + (epoch*options['epochs']))
-                writer.flush()
 
             loss.backward()
             optimizer.step()
@@ -154,7 +153,6 @@ def trainAutoencoder(data, observer, options):
             ax.plot(tq, w[:, :2, 0])
             ax.plot(tq_, w_[:, :2, 0])
             writer.add_figure("recon", fig, global_step=epoch, close=True, walltime=None)
-            writer.flush()
 
     print('Finished Training')
 
