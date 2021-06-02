@@ -10,10 +10,11 @@ __init__.pyc
 
 # Log files
 runs/
+jupyter_notebook/runs/
 
 # Editor directories and files
 .idea
-.vscode
+.vscode/
 *.suo
 *.ntvs*
 *.njsproj

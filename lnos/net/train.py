@@ -81,23 +81,26 @@ def trainNonlinearLuenbergerTransformation(
 
 
 def trainAutoencoder(data, observer, options):
+
     # Make torch use the GPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # model params
+    # Initialize Autoencoder
     model = Autoencoder(observer, options)
     model.to(device)
+
+    # Set optimizer
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+    # Make use of tensorboard
     if options['isTensorboard']:
         writer = SummaryWriter()
 
     # Create trainloader
     trainloader = utils.data.DataLoader(data, batch_size=options['batchSize'],
-                                        shuffle=True, num_workers=2)
+                                        shuffle=True, num_workers=2, drop_last=True)
 
-    # Train Transformation
-    # Loop over dataset
+    # Train autoencoder
     for epoch in range(options['epochs']):
 
         # Track loss
@@ -105,57 +108,80 @@ def trainAutoencoder(data, observer, options):
 
         # Train
         for i, batch in enumerate(trainloader, 0):
-            # Set input and labels
+            # Split batch into inputs and labels
             inputs = torch.tensor(batch[:, :observer.dim_x], requires_grad=True)
             labels = torch.tensor(batch[:, observer.dim_x:], requires_grad=False)
 
-            # Zero the parameter gradients
+            # Zero gradients
             optimizer.zero_grad()
 
-            # Forward
+            # Predict
             z, x_hat = model(inputs)
 
+            # Compute gradients of T_u with respect to inputs
             dTdx = torch.autograd.functional.jacobian(
                 model.encoder, inputs, create_graph=False, strict=False, vectorize=False)
             dTdx = dTdx[dTdx != 0].reshape((options['batchSize'], observer.dim_z, observer.dim_x))
 
-            # Forward + Backward + Optimize
+            # Compute loss
             loss, loss1, loss2 = model.loss(inputs, x_hat, dTdx, z)
+
+            # Write loss to tensorboard
             if options['isTensorboard']:
                 writer.add_scalars("Loss/train", {
                     'loss': loss,
                     'loss1': loss1,
                     'loss2': loss2,
-                }, i + (epoch*options['epochs']))
+                }, i + (epoch*len(trainloader)))
 
+            # Gradient step and optimize
             loss.backward()
             optimizer.step()
 
-            print('{} loss: {}'.format(i, loss))
+            # Print statistics
+            running_loss += loss.item()
 
-        # validate prediction
+            # Print every 200 mini batches
+            if i % 200 == 199:
+                print('[%d, %5d] loss: %.3f' %
+                      (epoch + 1, i + 1, running_loss / 200))
+                running_loss = 0.00
 
+        print('====> Epoch: {} done!'.format(epoch + 1))    
+
+        # Validate prediction after each epoch in tensorboard
         if options['isTensorboard']:
-            with torch.no_grad():
-                z, x_hat = model(data[0, :observer.dim_x])
 
+            randInt = torch.randint(0, data.shape[0], (1,))[0]
+
+            # Predict for a random datapoint
+            with torch.no_grad():
+                z, x_hat = model(data[randInt, :observer.dim_x])
+
+            # Simulation parameters
             tsim = (0, 50)
             dt = 1e-2
 
-            w_test = torch.cat((x_hat, z)).reshape(5, 1)
-            w_ground = data[0].reshape(5, 1)
+            # Set inital simulation value for prediction and truth
+            w_0_pred = torch.cat((x_hat, z)).reshape(5, 1)
+            w_0_truth = data[randInt].reshape(5, 1)
 
-            tq, w = observer.simulateLueneberger(w_ground, tsim, dt)
-            tq_, w_ = observer.simulateLueneberger(w_test, tsim, dt)
+            # Simulate for initial values
+            tq, w_pred = observer.simulateLueneberger(w_0_pred, tsim, dt)
+            tq_, w_truth = observer.simulateLueneberger(w_0_truth, tsim, dt)
 
+            # Create matplot figure
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
-            ax.plot(tq, w[:, :2, 0])
-            ax.plot(tq_, w_[:, :2, 0])
+            ax.plot(tq, w_pred[:, :2, 0])
+            ax.plot(tq_, w_truth[:, :2, 0])
+
+            # Write figure to tensorboard
             writer.add_figure("recon", fig, global_step=epoch, close=True, walltime=None)
 
     print('Finished Training')
 
+    # Close tensorboard writer
     if options['isTensorboard']:
         writer.close()
 
