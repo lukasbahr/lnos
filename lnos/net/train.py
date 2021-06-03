@@ -109,8 +109,8 @@ def trainAutoencoder(data, observer, options):
         # Train
         for i, batch in enumerate(trainloader, 0):
             # Split batch into inputs and labels
-            inputs = torch.tensor(batch[:, :observer.dim_x], requires_grad=True)
-            labels = torch.tensor(batch[:, observer.dim_x:], requires_grad=False)
+            inputs = torch.tensor(batch[:, :observer.dim_x]).to(device)
+            labels = torch.tensor(batch[:, observer.dim_x:]).to(device)
 
             # Zero gradients
             optimizer.zero_grad()
@@ -156,14 +156,15 @@ def trainAutoencoder(data, observer, options):
 
             # Predict for a random datapoint
             with torch.no_grad():
-                z, x_hat = model(data[randInt, :observer.dim_x])
+                inputs = data[randInt, :observer.dim_x].to(device)
+                z, x_hat = model(inputs)
 
             # Simulation parameters
             tsim = (0, 50)
             dt = 1e-2
 
             # Set inital simulation value for prediction and truth
-            w_0_pred = torch.cat((x_hat, z)).reshape(5, 1)
+            w_0_pred = torch.cat((x_hat.to('cpu'), z.to('cpu'))).reshape(5, 1)
             w_0_truth = data[randInt].reshape(5, 1)
 
             # Simulate for initial values
