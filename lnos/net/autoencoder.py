@@ -4,10 +4,11 @@ from torch import nn
 
 
 class Autoencoder(nn.Module):
-    def __init__(self, observer: LuenebergerObserver, options):
+    def __init__(self, observer: LuenebergerObserver, options, device):
         super(Autoencoder, self).__init__()
         self.observer = observer
         self.options = options
+        self.device = device
 
         numHL = options['numHiddenLayers']
         sizeHL = options['sizeHiddenLayer']
@@ -47,11 +48,6 @@ class Autoencoder(nn.Module):
 
     def loss(self, x, x_hat, dTdx, z):
 
-        z = z.to("cpu")
-        x = z.to("cpu")
-        x_hat = x_hat.to("cpu")
-        dTdx = dTdx.to("cpu")
-
         mse = nn.MSELoss()
 
         loss1 = self.options['reconLambda'] * mse(x, x_hat)
@@ -60,7 +56,7 @@ class Autoencoder(nn.Module):
         for i in range(self.options['batchSize']):
             lhs[:, i] = torch.matmul(dTdx[i], self.observer.f(x.T).T[i]).T
 
-        rhs = torch.matmul(self.observer.D, z.T)+torch.matmul(self.observer.F, self.observer.h(x.T))
+        rhs = torch.matmul(self.observer.D.to(self.device), z.T)+torch.matmul(self.observer.F.to(self.device), self.observer.h(x.T).to(self.device))
 
         loss2 = mse(lhs, rhs)
 

@@ -86,7 +86,7 @@ def trainAutoencoder(data, observer, options):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Initialize Autoencoder
-    model = Autoencoder(observer, options)
+    model = Autoencoder(observer, options, device)
     model.to(device)
 
     # Set optimizer
