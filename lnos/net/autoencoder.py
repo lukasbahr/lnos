@@ -47,6 +47,11 @@ class Autoencoder(nn.Module):
 
     def loss(self, x, x_hat, dTdx, z):
 
+        z = z.to("cpu")
+        x = z.to("cpu")
+        x_hat = x_hat.to("cpu")
+        dTdx = dTdx.to("cpu")
+
         mse = nn.MSELoss()
 
         loss1 = self.options['reconLambda'] * mse(x, x_hat)
