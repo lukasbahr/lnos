@@ -49,7 +49,7 @@ def createDefaultObserver(options):
     if options['system'] == 'autonomous':
         f, h, g, u, dim_x, dim_y, eigen = getAutonomousSystem()
     elif options['system'] == 'van_der_pohl':
-        f, h, g, u, dim_x, dim_y, eigen = getVanDerPohlSystem
+        f, h, g, u, dim_x, dim_y, eigen = getVanDerPohlSystem()
     else:
         print("Can't find system {}. Available options ['autonomous', 'van_der_pohl']".format(options['system']))
 
