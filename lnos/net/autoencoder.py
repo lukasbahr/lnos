@@ -58,7 +58,7 @@ class Autoencoder(nn.Module):
 
         rhs = torch.matmul(self.observer.D.to(self.device), z.T)+torch.matmul(self.observer.F.to(self.device), self.observer.h(x.T).to(self.device))
 
-        loss2 = mse(lhs, rhs)
+        loss2 = mse(lhs.to(self.device), rhs)
 
         loss = loss1 + loss2
 
