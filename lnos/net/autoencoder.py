@@ -24,14 +24,14 @@ class Autoencoder(nn.Module):
 
         # Encoder architecture
         self.encoderLayers = nn.ModuleList()
-        self.encoderLayers.append(nn.Linear(self.observer.dim_x, sizeHL))
+        self.encoderLayers.append(nn.Linear(self.observer.dim_x+1, sizeHL))
         for i in range(numHL):
             self.encoderLayers.append(nn.Linear(sizeHL, sizeHL))
-        self.encoderLayers.append(nn.Linear(sizeHL, self.observer.dim_z))
+        self.encoderLayers.append(nn.Linear(sizeHL, self.observer.dim_z+1))
 
         # Decoder architecture
         self.decoderLayers = nn.ModuleList()
-        self.decoderLayers.append(nn.Linear(self.observer.dim_z, sizeHL))
+        self.decoderLayers.append(nn.Linear(self.observer.dim_z+1, sizeHL))
         for i in range(numHL):
             self.decoderLayers.append(nn.Linear(sizeHL, sizeHL))
         self.decoderLayers.append(nn.Linear(sizeHL, self.observer.dim_x))
