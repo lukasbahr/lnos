@@ -22,17 +22,18 @@ class Autoencoder(nn.Module):
                 "Activation function {} not found. Available options: ['relu', 'tanh'].".format(
                     options['activation']))
 
+        # Encoder architecture
         self.encoderLayers = nn.ModuleList()
-        self.decoderLayers = nn.ModuleList()
-
         self.encoderLayers.append(nn.Linear(self.observer.dim_x, sizeHL))
-        self.decoderLayers.append(nn.Linear(self.observer.dim_z, sizeHL))
-
         for i in range(numHL):
             self.encoderLayers.append(nn.Linear(sizeHL, sizeHL))
-            self.decoderLayers.append(nn.Linear(sizeHL, sizeHL))
-
         self.encoderLayers.append(nn.Linear(sizeHL, self.observer.dim_z))
+
+        # Decoder architecture
+        self.decoderLayers = nn.ModuleList()
+        self.decoderLayers.append(nn.Linear(self.observer.dim_z, sizeHL))
+        for i in range(numHL):
+            self.decoderLayers.append(nn.Linear(sizeHL, sizeHL))
         self.decoderLayers.append(nn.Linear(sizeHL, self.observer.dim_x))
 
     def encoder(self, x):
@@ -46,9 +47,13 @@ class Autoencoder(nn.Module):
             x = self.act(layer(x))
         return x
 
-    def loss(self, x, x_hat, dTdx, z):
-
+    def loss(self, x, x_hat, z):
         mse = nn.MSELoss()
+
+        # Compute gradients of T_u with respect to inputs
+        dTdx = torch.autograd.functional.jacobian(
+            self.encoder, x, create_graph=False, strict=False, vectorize=False)
+        dTdx = dTdx[dTdx != 0].reshape((self.options['batchSize'], self.observer.dim_z, self.observer.dim_x))
 
         loss1 = self.options['reconLambda'] * mse(x, x_hat)
 
@@ -56,7 +61,9 @@ class Autoencoder(nn.Module):
         for i in range(self.options['batchSize']):
             lhs[:, i] = torch.matmul(dTdx[i], self.observer.f(x.T).T[i]).T
 
-        rhs = torch.matmul(self.observer.D.to(self.device), z.T)+torch.matmul(self.observer.F.to(self.device), self.observer.h(x.T).to(self.device))
+        rhs = torch.matmul(self.observer.D.to(self.device),
+                           z.T) + torch.matmul(self.observer.F.to(self.device),
+                                               self.observer.h(x.T).to(self.device))
 
         loss2 = mse(lhs.to(self.device), rhs)
 

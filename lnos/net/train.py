@@ -118,13 +118,8 @@ def trainAutoencoder(data, observer, options):
             # Predict
             z, x_hat = model(inputs)
 
-            # Compute gradients of T_u with respect to inputs
-            dTdx = torch.autograd.functional.jacobian(
-                model.encoder, inputs, create_graph=False, strict=False, vectorize=False)
-            dTdx = dTdx[dTdx != 0].reshape((options['batchSize'], observer.dim_z, observer.dim_x))
-
             # Compute loss
-            loss, loss1, loss2 = model.loss(inputs, x_hat, dTdx, z)
+            loss, loss1, loss2 = model.loss(inputs, x_hat, z)
 
             # Write loss to tensorboard
             if options['isTensorboard']:
